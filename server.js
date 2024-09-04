@@ -5,6 +5,21 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const app = express(); // Déclaration de `app` avant l'utilisation
+const port = 4000;
+
+// Middleware CORS
+app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content, Accept, Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    next();
+});
+
+// Middleware pour parser le JSON et les données URL-encoded
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 function createTransporter(userEmail, userPassword) {
     let service;
 
@@ -55,7 +70,6 @@ const db = mysql2.createConnection({
     charset: process.env.DB_CHARSET
 });
 
-
 db.connect((err) => {
     if (err) {
         console.error('Erreur de connexion à la base de données: ' + err.stack);
@@ -64,12 +78,7 @@ db.connect((err) => {
     console.log('Connecté à la base de données MySQL en tant que ' + db.threadId);
 });
 
-const app = express();
-const port = 4000;
-
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
+// Routes
 app.get('/', (req, res) => {
     res.send('au moins ça restera à vie dans ma tête');
 });
@@ -110,6 +119,7 @@ app.post('/informations', (req, res) => {
     });
 });
 
+// Démarrez le serveur
 app.listen(port, () => {
     console.log(`Example app listening on port ${port}`);
 });
