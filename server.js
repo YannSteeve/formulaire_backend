@@ -1,6 +1,9 @@
 import express from 'express';
 import mysql2 from 'mysql2';
 import nodemailer from 'nodemailer';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 function createTransporter(userEmail, userPassword) {
     let service;
@@ -22,13 +25,11 @@ function createTransporter(userEmail, userPassword) {
     });
 }
 
-// Exemple d'utilisation
-const userEmail = 'mouendouyann08@gmail.com';
-const userPassword = 'pivw atqg cwoc erzv';
+const userEmail = process.env.USER_EMAIL;
+const userPassword = process.env.USER_PASSWORD;
 
 const transporter = createTransporter(userEmail, userPassword);
 
-// Fonction pour envoyer l'email
 function envoyerEmail(destinataire, contenu) {
     const mailOptions = {
         from: userEmail,
@@ -47,14 +48,13 @@ function envoyerEmail(destinataire, contenu) {
 }
 
 const db = mysql2.createConnection({
-    host: 'mysql-yannsteeve.alwaysdata.net',
-    user: '373412_yann',
-    password: 'St17081960',
-    database: 'yannsteeve_apprenant_241',
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
     charset: 'utf8mb4_general_ci'
 });
 
-// Établir la connexion
 db.connect((err) => {
     if (err) {
         console.error('Erreur de connexion à la base de données: ' + err.stack);
@@ -69,7 +69,6 @@ const port = 4000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// routes
 app.get('/', (req, res) => {
     res.send('au moins ça restera à vie dans ma tête');
 });
@@ -106,11 +105,10 @@ app.post('/informations', (req, res) => {
             envoyerEmail(email, contenuEmail);
 
             res.send(`Vos données ont été bien reçues, un récapitulatif a été envoyé à ${email}.`);
-        }); // Ajout de la parenthèse fermante ici
+        });
     });
 });
 
-// Fin de route
 app.listen(port, () => {
     console.log(`Example app listening on port ${port}`);
 });
