@@ -2,23 +2,9 @@ import express from 'express';
 import mysql2 from 'mysql2';
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 
 dotenv.config();
-
-const app = express(); // Déclaration de `app` avant l'utilisation
-const port = 4000;
-
-// Middleware CORS
-app.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content, Accept, Content-Type, Authorization');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-    next();
-});
-
-// Middleware pour parser le JSON et les données URL-encoded
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
 function createTransporter(userEmail, userPassword) {
     let service;
@@ -78,7 +64,19 @@ db.connect((err) => {
     console.log('Connecté à la base de données MySQL en tant que ' + db.threadId);
 });
 
-// Routes
+const app = express();
+const port = 4000;
+
+// Middleware pour parser les données JSON et URL-encoded
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Configuration du proxy
+app.use(createProxyMiddleware({
+    target: 'https://formulaire-backend.onrender.com', // Remplace par l'URL de ton backend
+    changeOrigin: true,
+}));
+
 app.get('/', (req, res) => {
     res.send('au moins ça restera à vie dans ma tête');
 });
@@ -87,6 +85,7 @@ app.get('/formulaire', (req, res) => {
     res.send('tu te trouves en ce moment dans le formulaire');
 });
 
+// Route pour traiter les informations
 app.post('/informations', (req, res) => {
     const { nom, prenom, email, referentiel, quartier, numeros, sex } = req.body;
 
@@ -119,7 +118,6 @@ app.post('/informations', (req, res) => {
     });
 });
 
-// Démarrez le serveur
 app.listen(port, () => {
     console.log(`Example app listening on port ${port}`);
 });
