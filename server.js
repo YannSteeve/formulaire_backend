@@ -6,6 +6,21 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 
 dotenv.config();
 
+const REQUIRED_ENV_VARS = [
+    'USER_EMAIL',
+    'USER_PASSWORD',
+    'DB_HOST',
+    'DB_USER',
+    'DB_PASSWORD',
+    'DB_NAME'
+];
+
+const missingEnvVars = REQUIRED_ENV_VARS.filter((key) => !process.env[key]);
+if (missingEnvVars.length > 0) {
+    console.error(`Variables d'environnement manquantes: ${missingEnvVars.join(', ')}`);
+    process.exit(1);
+}
+
 function createTransporter(userEmail, userPassword) {
     let service;
 
@@ -29,9 +44,27 @@ function createTransporter(userEmail, userPassword) {
 const userEmail = process.env.USER_EMAIL;
 const userPassword = process.env.USER_PASSWORD;
 
-const transporter = createTransporter(userEmail, userPassword);
+let transporter;
+
+try {
+    transporter = createTransporter(userEmail, userPassword);
+    transporter.verify((error) => {
+        if (error) {
+            console.error('Erreur de configuration SMTP:', error.message);
+        } else {
+            console.log('Configuration SMTP validée.');
+        }
+    });
+} catch (error) {
+    console.error('Erreur lors de la création du transporteur email:', error.message);
+}
 
 function envoyerEmail(destinataire, contenu) {
+    if (!transporter) {
+        console.error('Transporteur email indisponible. Envoi annulé.');
+        return;
+    }
+
     const mailOptions = {
         from: userEmail,
         to: destinataire,
@@ -53,7 +86,7 @@ const db = mysql2.createConnection({
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
-    charset: process.env.DB_CHARSET
+    charset: process.env.DB_CHARSET || 'utf8mb4'
 });
 
 db.connect((err) => {
@@ -66,6 +99,32 @@ db.connect((err) => {
 
 const app = express();
 const port = 4000;
+
+const requiredFields = ['nom', 'prenom', 'email', 'referentiel', 'quartier', 'numeros', 'sex'];
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const phoneRegex = /^[0-9+().\s-]+$/;
+
+function isNonEmptyString(value) {
+    return typeof value === 'string' && value.trim().length > 0;
+}
+
+function validateInformationsPayload(req, res, next) {
+    const missingFields = requiredFields.filter((field) => !isNonEmptyString(req.body[field]));
+
+    if (missingFields.length > 0) {
+        return res.status(400).send(`Champs manquants ou invalides: ${missingFields.join(', ')}`);
+    }
+
+    if (!emailRegex.test(req.body.email)) {
+        return res.status(400).send('Adresse email invalide.');
+    }
+
+    if (!phoneRegex.test(req.body.numeros)) {
+        return res.status(400).send('Numéro de téléphone invalide.');
+    }
+
+    return next();
+}
 
 // Middleware pour parser les données JSON et URL-encoded
 app.use(express.json());
@@ -86,7 +145,7 @@ app.get('/formulaire', (req, res) => {
 });
 
 // Route pour traiter les informations
-app.post('/informations', (req, res) => {
+app.post('/informations', validateInformationsPayload, (req, res) => {
     const { nom, prenom, email, referentiel, quartier, numeros, sex } = req.body;
 
     const checkEmailSql = 'SELECT * FROM utilisateurs WHERE email = ?';
@@ -120,4 +179,18 @@ app.post('/informations', (req, res) => {
 
 app.listen(port, () => {
     console.log(`Example app listening on port ${port}`);
+});
+
+process.on('SIGINT', () => {
+    db.end(() => {
+        console.log('Connexion à la base de données fermée.');
+        process.exit(0);
+    });
+});
+
+process.on('SIGTERM', () => {
+    db.end(() => {
+        console.log('Connexion à la base de données fermée.');
+        process.exit(0);
+    });
 });
